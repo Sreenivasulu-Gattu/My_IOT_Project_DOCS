@@ -1,0 +1,164 @@
+#include "HX711.h"
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <SoftwareSerial.h>
+
+
+LiquidCrystal_I2C Display(0x27,16,2);
+SoftwareSerial mySerial(6,5);
+#define DEBUG_HX711
+#define calibration_factor -7050.0
+
+HX711 scale;
+
+#define LOADCELL_DOUT_PIN  8
+#define LOADCELL_SCK_PIN  9
+int SensorPin = 13;
+float Value=0;
+String incomingData;
+String message = "";
+
+void LoadCell_setup() 
+  {
+    //Serial.begin(9600);
+    Serial.println("HX711 scale demo");
+    scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
+    scale.set_scale(calibration_factor); //This value is obtained by using the SparkFun_HX711_Calibration sketch
+    scale.tare(); //Assuming there is no weight on the scale at start up, reset the scale to 0
+    Serial.println("Readings:");
+  }
+void LoadCellData() 
+  {
+    Serial.print("Reading: ");
+     float Values =((scale.get_units()*100)-100); //scale.get_units() returns a float
+    //float Values =values;
+    Serial.print(Values);
+    Serial.print("Grams"); //You can change this to kg but you'll need to refactor the calibration_factor
+    Serial.println();
+    Display.clear();
+    Display.setCursor(0,0);
+    Display.print("Your Weight");
+    Display.setCursor(0,1);
+    Display.print(Values);
+    Display.setCursor(8,1);
+    Display.print("Grams");
+    delay(1000);
+            
+    if(Values <=2000 && Values>=150)
+    {
+      Display.setCursor(0,0);
+      Display.print("YourGas Below5KG");
+      Display.setCursor(0,1);
+      Display.print("PleaseBookYourGas");
+      delay(3000);
+      Send_setup();
+    }
+   }
+
+void Send_setup()
+  {
+   
+    mySerial.begin(9600);
+    Serial.println("Initializing..."); 
+    delay(1000);
+      
+    mySerial.println("AT"); //Once the handshake test is successful, it will back to OK
+    updateSerial();
+  
+    mySerial.println("AT+CMGF=1"); // Configuring TEXT mode
+    updateSerial();
+    
+    mySerial.println("AT+CMGS=\"+918374304499\"");//change ZZ with country code and xxxxxxxxxxx with phone number to sms
+    updateSerial();
+    
+    mySerial.print("Booking"); //text content
+    updateSerial();
+    mySerial.write(26);
+}
+void Send_setup2()
+  {
+   
+    mySerial.begin(9600);
+    Serial.println("Initializing..."); 
+    delay(1000);
+      
+    mySerial.println("AT"); //Once the handshake test is successful, it will back to OK
+    updateSerial();
+  
+    mySerial.println("AT+CMGF=1"); // Configuring TEXT mode
+    updateSerial();
+    
+    mySerial.println("AT+CMGS=\"+918374304499\"");//change ZZ with country code and xxxxxxxxxxx with phone number to sms
+    updateSerial();
+    
+    mySerial.print("Booking Process Successfully Completed..!!!"); //text content
+    updateSerial();
+    mySerial.write(26);
+}
+
+void Read_setup()
+{
+  //Serial.begin(115200);
+  mySerial.begin(9600); // baudrate for GSM shield
+  mySerial.print("AT+CMGF=1\r");  
+  delay(100);
+  mySerial.print("AT+CNMI=2,2,0,0,0\r"); 
+  delay(100);
+}
+
+void updateSerial()
+{
+  delay(500);
+  while (Serial.available()) 
+    {
+      mySerial.write(Serial.read());//Forward what Serial received to Software Serial Port
+    }
+   while(mySerial.available()) 
+    {
+      Serial.write(mySerial.read());//Forward what Software Serial received to Serial Port
+    }
+}
+void receive_message()
+{
+  if (mySerial.available() > 0)
+  {
+    incomingData = mySerial.readString(); // Get the data from the serial port.
+    Serial.print(incomingData); 
+    delay(1000); 
+  }
+}
+
+void setup()
+{
+  Serial.begin(115200);
+  Display.init();
+  Display.backlight();
+  Display.setCursor(4,0);
+  Display.print("Welcome To");
+  Display.setCursor(0,1);
+  Display.print("GasLeackageSystem");
+  delay(2000);
+  pinMode(SensorPin,INPUT);
+  LoadCell_setup();
+  Read_setup();
+}
+
+void loop()
+{
+  
+  receive_message();
+  if(incomingData.indexOf("Book")>=0)
+  {
+    Display.clear();
+    Display.setCursor(0,0);
+    Display.print("YourGas Booking");
+    Display.setCursor(3,1);
+    Display.print("Completed..!!");
+    Send_setup2();
+    delay(5000);
+    Display.clear();
+    incomingData="";
+    
+  }
+  LoadCellData();
+}
